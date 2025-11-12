@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  client
+  admin
+}
+
+enum OrderStatus {
+  plasata
+  in_livrare
+  livrata
+  anulata
+}
+
+enum PaymentMethod {
+  CARD
+  COD       
+  TRANSFER  
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+
+model User {
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  email      String    @unique
+  password   String
+
+  firstName  String
+  lastName   String
+  phone      String?   
+
+  role       Role      @default(client)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  addresses  Address[]
+  orders     Order[]
+}
+
+model Address {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  label      String?          
+  line1      String            
+  line2      String?           
+  city       String
+  region     String?           
+  postalCode String?
+  country    String   @default("RO")
+  isDefault  Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isDefault])
+}
+
+model Book {
+  id          Int        @id @default(autoincrement())
+  title       String
+  author      String?
+  genre       String?
+
+  price       Decimal    @db.Decimal(10, 2)
+
+  stock       Int         @default(0)
+  description String?
+  imageUrl    String?
+
+  isbn13      String?     @unique
+  publisher   String?
+  publishedAt DateTime?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  orderItems  OrderItem[]
+  @@index([title])
+  @@index([author])
+}
+
+model Order {
+  id             Int           @id @default(autoincrement())
+  userId         Int
+  status         OrderStatus   @default(plasata)
+  paymentMethod  PaymentMethod 
+
+  total          Decimal       @db.Decimal(10, 2)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
+  shipping       OrderAddress? 
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  bookId    Int
+  quantity  Int      @default(1)
+
+  unitPrice Decimal  @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+
+  order     Order    @relation(fields: [orderId], references: [id])
+  book      Book     @relation(fields: [bookId], references: [id])
+
+  @@index([orderId])
+  @@index([bookId])
+}
+
+
+model OrderAddress {
+  id         Int      @id @default(autoincrement())
+  orderId    Int      @unique
+
+  recipient  String   
+  line1      String
+  line2      String?
+  city       String
+  region     String?
+  postalCode String?
+  country    String    @default("RO")
+  phone      String?
+
+  order      Order    @relation(fields: [orderId], references: [id])
+}
+
+model Payment {
+  id               Int            @id @default(autoincrement())
+  orderId          Int            @unique
+  method           PaymentMethod
+  status           PaymentStatus  @default(PENDING)
+
+  amount           Decimal        @db.Decimal(10, 2)
+  currency         String         @default("RON")
+
+  provider         String?        
+  providerPaymentId String?       
+
+  createdAt        DateTime       @default(now())
+
+  order            Order          @relation(fields: [orderId], references: [id])
+}
